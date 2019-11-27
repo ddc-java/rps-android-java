@@ -19,7 +19,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
+import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.View;
 import edu.cnm.deepdive.rps.model.Arena;
@@ -37,26 +37,23 @@ public class TerrainView extends View {
   private static final float MAX_HUE = 360;
   private static final float SATURATION = 1;
   private static final float BRIGHTNESS = 0.85f;
+  private static final long ACTIVE_SLEEP_INTERVAL = 1;
+  private static final long INACTIVE_SLEEP_INTERVAL = 50;
 
-  private Canvas canvas;
   private Bitmap bitmap;
   private Arena arena;
   private byte[][] terrain;
   private int[] breedColors;
-  private Paint paint;
-  private boolean measured;
-  private long generation;
+  private Rect source = new Rect();
+  private Rect dest = new Rect();
+  private Updater updater;
 
   {
     setWillNotDraw(false);
-    paint = new Paint();
-    paint.setStyle(Paint.Style.FILL);
   }
 
   /**
    * Initializes by chaining to {@link View#View(Context)}.
-   *
-   * @param context
    */
   public TerrainView(Context context) {
     super(context);
@@ -95,14 +92,12 @@ public class TerrainView extends View {
    */
   @Override
   protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-    measured = false;
     int width = getSuggestedMinimumWidth();
     int height = getSuggestedMinimumHeight();
     width = resolveSizeAndState(getPaddingLeft() + getPaddingRight() + width, widthMeasureSpec, 0);
     height = resolveSizeAndState(getPaddingTop() + getPaddingBottom() + height, heightMeasureSpec, 0);
     int size = Math.max(width, height);
     setMeasuredDimension(size, size);
-    bitmap = null;
   }
 
   /**
@@ -112,7 +107,6 @@ public class TerrainView extends View {
   @Override
   protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
     super.onLayout(changed, left, top, right, bottom);
-    measured = true;
     updateBitmap();
   }
 
@@ -124,8 +118,23 @@ public class TerrainView extends View {
   @Override
   protected void onDraw(Canvas canvas) {
     if (bitmap != null) {
-      canvas.drawBitmap(bitmap, 0, 0, null);
+      dest.set(0, 0, getWidth(), getHeight());
+      canvas.drawBitmap(bitmap, source, dest, null);
     }
+  }
+
+  @Override
+  protected void onAttachedToWindow() {
+    super.onAttachedToWindow();
+    stopUpdater();
+    updater = new Updater();
+    updater.start();
+  }
+
+  @Override
+  protected void onDetachedFromWindow() {
+    super.onDetachedFromWindow();
+    stopUpdater();
   }
 
   /**
@@ -140,6 +149,8 @@ public class TerrainView extends View {
       int numBreeds = arena.getNumBreeds();
       int size = arena.getArenaSize();
       terrain = new byte[size][size];
+      bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565);
+      source.set(0, 0, size, size);
       float[] hsv = {0, SATURATION, BRIGHTNESS};
       float hueInterval = MAX_HUE / numBreeds;
       breedColors = new int[numBreeds];
@@ -147,6 +158,8 @@ public class TerrainView extends View {
         breedColors[i] = Color.HSVToColor(hsv);
         hsv[0] += hueInterval;
       }
+    } else {
+      bitmap = null;
     }
   }
 
@@ -158,33 +171,64 @@ public class TerrainView extends View {
    * @param generation number of generations (iterations) completed in the {@link Arena} simulation.
    */
   public void setGeneration(long generation) {
-    if (generation == 0 || generation != this.generation) {
-      new Thread(() -> {
-        updateBitmap();
-        this.generation = generation;
-      }).start();
+    if (updater != null) {
+      updater.setGeneration(generation);
     }
   }
 
   private void updateBitmap() {
-    if (measured && terrain != null) {
-      if (bitmap == null) {
-        bitmap = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.RGB_565);
-        canvas = new Canvas(bitmap);
-      }
+    if (bitmap != null) {
       arena.copyTerrain(terrain);
-      float cellWidth = (float) getWidth() / terrain[0].length;
-      float cellHeight = (float) getHeight() / terrain.length;
       for (int row = 0; row < terrain.length; row++) {
-        float cellTop = cellHeight * row;
-        float cellBottom = cellTop + cellHeight;
         for (int col = 0; col < terrain[row].length; col++) {
-          float cellLeft = cellWidth * col;
-          paint.setColor(breedColors[terrain[row][col]]);
-          canvas.drawOval(cellLeft, cellTop, cellLeft + cellWidth, cellBottom, paint);
+          bitmap.setPixel(col, row, breedColors[terrain[row][col]]);
         }
       }
     }
+  }
+
+  private void stopUpdater() {
+    if (updater != null) {
+      updater.setRunning(false);
+      updater = null;
+    }
+  }
+
+  private class Updater extends Thread {
+
+    private volatile boolean running = true;
+    private volatile long generation = 0;
+
+    public void setRunning(boolean running) {
+      this.running = running;
+    }
+
+    public void setGeneration(long generation) {
+      this.generation = generation;
+    }
+
+    @Override
+    public void run() {
+      long generation = 0;
+      while (running) {
+        long sleepInterval = INACTIVE_SLEEP_INTERVAL;
+        if (this.generation == 0L || this.generation > generation) {
+          generation = this.generation;
+          updateBitmap();
+          postInvalidate();
+//          if (generation == 0L) {
+//            postInvalidate();
+//          }
+          sleepInterval = ACTIVE_SLEEP_INTERVAL;
+        }
+        try {
+          sleep(sleepInterval);
+        } catch (InterruptedException expected) {
+          // Ignore innocuous exception.
+        }
+      }
+    }
+
   }
 
 }
