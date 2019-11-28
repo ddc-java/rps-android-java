@@ -18,8 +18,11 @@ package edu.cnm.deepdive.rps.viewmodel;
 import android.app.Application;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
+import androidx.lifecycle.Lifecycle.Event;
+import androidx.lifecycle.LifecycleObserver;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.OnLifecycleEvent;
 import edu.cnm.deepdive.rps.model.Arena;
 
 /**
@@ -28,19 +31,23 @@ import edu.cnm.deepdive.rps.model.Arena;
  *
  * @author Nicholas Bennett
  */
-public class MainViewModel extends AndroidViewModel {
+public class MainViewModel extends AndroidViewModel implements LifecycleObserver {
 
-  /** Default number of breeds populating the {@link Arena} instance managed by this ViewModel. */
+  /**
+   * Default number of breeds populating the {@link Arena} instance managed by this ViewModel.
+   */
   public static final byte DEFAULT_NUM_BREEDS = 5;
-  /** Default size of the terrain used in the {@link Arena} instance managed by this ViewModel. */
-  public static final int DEFAULT_ARENA_SIZE = 50;
+  /**
+   * Default size of the terrain used in the {@link Arena} instance managed by this ViewModel.
+   */
+  public static final int DEFAULT_ARENA_SIZE = 100;
 
   private static final int ITERATIONS_PER_SLEEP = DEFAULT_ARENA_SIZE * DEFAULT_ARENA_SIZE / 20;
-  private static final int SLEEP_INTERVAL = 1;
+  private static final int SLEEP_INTERVAL = 2;
 
   private MutableLiveData<Arena> arena = new MutableLiveData<>(null);
-  private MutableLiveData<Long> generation = new MutableLiveData<>();
-  private MutableLiveData<Boolean> running = new MutableLiveData<>();
+  private MutableLiveData<Long> generation = new MutableLiveData<>(0L);
+  private MutableLiveData<Boolean> running = new MutableLiveData<>(false);
 
   private Runner runner;
 
@@ -82,17 +89,16 @@ public class MainViewModel extends AndroidViewModel {
    * Starts or resumes execution of the simulation of the {@link Arena} instance.
    */
   public void start() {
-    stopRunner();
+    stopRunner(false);
     running.setValue(true);
-    runner = new Runner();
-    runner.start();
+    startRunner();
   }
 
   /**
    * Pauses execution of the simulation of the {@link Arena} instance.
    */
   public void stop() {
-    stopRunner();
+    stopRunner(true);
     running.setValue(false);
   }
 
@@ -102,13 +108,13 @@ public class MainViewModel extends AndroidViewModel {
    * and width.
    */
   public void reset() {
+    stop();
     Arena arena = this.arena.getValue();
     if (arena == null) {
       reset(DEFAULT_NUM_BREEDS, DEFAULT_ARENA_SIZE);
     } else {
       arena.init();
       generation.setValue(arena.getGeneration());
-      running.setValue(false);
     }
   }
 
@@ -119,6 +125,7 @@ public class MainViewModel extends AndroidViewModel {
    * @param arenaSize height and width of the terrain of the new {@link Arena}.
    */
   public void reset(byte numBreeds, int arenaSize) {
+    stop();
     Arena arena = new Arena.Builder()
         .setNumBreeds(numBreeds)
         .setArenaSize(arenaSize)
@@ -126,11 +133,28 @@ public class MainViewModel extends AndroidViewModel {
     arena.init();
     this.arena.setValue(arena);
     generation.setValue(arena.getGeneration());
-    running.setValue(false);
   }
 
-  private void stopRunner() {
+  @OnLifecycleEvent(Event.ON_PAUSE)
+  private void pause() {
+    stopRunner(!running.getValue());
+  }
+
+  @OnLifecycleEvent(Event.ON_RESUME)
+  private void resume() {
+    if (running.getValue()) {
+      startRunner();
+    }
+  }
+
+  private void startRunner() {
+    runner = new Runner();
+    runner.start();
+  }
+
+  private void stopRunner(boolean postOnStop) {
     if (runner != null) {
+      runner.setPostOnStop(postOnStop);
       runner.setRunning(false);
       runner = null;
     }
@@ -139,6 +163,7 @@ public class MainViewModel extends AndroidViewModel {
   private class Runner extends Thread {
 
     private boolean running = true;
+    private boolean postOnStop;
 
     @Override
     public void run() {
@@ -157,11 +182,17 @@ public class MainViewModel extends AndroidViewModel {
           // Ignore innocuous exception.
         }
       }
-      MainViewModel.this.running.postValue(false);
+      if (postOnStop) {
+        MainViewModel.this.running.postValue(false);
+      }
     }
 
     public void setRunning(boolean running) {
       this.running = running;
+    }
+
+    public void setPostOnStop(boolean postOnStop) {
+      this.postOnStop = postOnStop;
     }
 
   }

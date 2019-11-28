@@ -25,10 +25,8 @@ import android.view.View;
 import edu.cnm.deepdive.rps.model.Arena;
 
 /**
- * {@link View} subclass that renders the cells on the terrain of an {@link Arena}. Note that this
- * is not a {@link android.view.SurfaceView}; updates are being driven entirely by updates to the
- * underlying LiveData; if these occur too frequently, it would probably make sense to implement a
- * {@link android.view.SurfaceView} subclass instead.
+ * {@link View} subclass that renders the cells on the terrain of an {@link Arena}, using a scaled
+ * one-pixel-per-cell scheme.
  *
  * @author Nicholas Bennett
  */
@@ -37,8 +35,8 @@ public class TerrainView extends View {
   private static final float MAX_HUE = 360;
   private static final float SATURATION = 1;
   private static final float BRIGHTNESS = 0.85f;
-  private static final long ACTIVE_SLEEP_INTERVAL = 1;
-  private static final long INACTIVE_SLEEP_INTERVAL = 50;
+  private static final long ACTIVE_SLEEP_INTERVAL = 10;
+  private static final long INACTIVE_SLEEP_INTERVAL = 100;
 
   private Bitmap bitmap;
   private Arena arena;
@@ -212,13 +210,12 @@ public class TerrainView extends View {
       long generation = 0;
       while (running) {
         long sleepInterval = INACTIVE_SLEEP_INTERVAL;
-        if (this.generation == 0L || this.generation > generation) {
+        if (this.generation == 0 || this.generation > generation) {
           generation = this.generation;
           updateBitmap();
-          postInvalidate();
-//          if (generation == 0L) {
-//            postInvalidate();
-//          }
+          if (generation == 0) {
+            postInvalidate();
+          }
           sleepInterval = ACTIVE_SLEEP_INTERVAL;
         }
         try {
