@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019 Nicholas Bennett & Deep Dive Coding/CNM Ingenuity
+ *  Copyright 2020 Deep Dive Coding/CNM Ingenuity
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ public class MainViewModel extends AndroidViewModel implements LifecycleObserver
   /**
    * Default number of breeds populating the {@link Arena} instance managed by this ViewModel.
    */
-  public static final byte DEFAULT_NUM_BREEDS = 5;
+  public static final byte DEFAULT_NUM_BREEDS = 3;
   /**
    * Default size of the terrain used in the {@link Arena} instance managed by this ViewModel.
    */
@@ -45,9 +45,9 @@ public class MainViewModel extends AndroidViewModel implements LifecycleObserver
   private static final int ITERATIONS_PER_SLEEP = DEFAULT_ARENA_SIZE * DEFAULT_ARENA_SIZE / 20;
   private static final int SLEEP_INTERVAL = 2;
 
-  private MutableLiveData<Arena> arena = new MutableLiveData<>(null);
-  private MutableLiveData<Long> generation = new MutableLiveData<>(0L);
-  private MutableLiveData<Boolean> running = new MutableLiveData<>(false);
+  private final MutableLiveData<Arena> arena;
+  private final MutableLiveData<Long> generation;
+  private final MutableLiveData<Boolean> running;
 
   private Runner runner;
 
@@ -59,6 +59,9 @@ public class MainViewModel extends AndroidViewModel implements LifecycleObserver
    */
   public MainViewModel(@NonNull Application application) {
     super(application);
+    arena = new MutableLiveData<>(null);
+    generation = new MutableLiveData<>(0L);
+    running = new MutableLiveData<>(false);
     reset();
   }
 
@@ -81,7 +84,7 @@ public class MainViewModel extends AndroidViewModel implements LifecycleObserver
    * Returns LiveData containing the current {@code long} generation count of the {@link Arena}
    * instance.
    */
-  public MutableLiveData<Long> getGeneration() {
+  public LiveData<Long> getGeneration() {
     return generation;
   }
 
@@ -137,11 +140,13 @@ public class MainViewModel extends AndroidViewModel implements LifecycleObserver
 
   @OnLifecycleEvent(Event.ON_PAUSE)
   private void pause() {
+    //noinspection ConstantConditions
     stopRunner(!running.getValue());
   }
 
   @OnLifecycleEvent(Event.ON_RESUME)
   private void resume() {
+    //noinspection ConstantConditions
     if (running.getValue()) {
       startRunner();
     }

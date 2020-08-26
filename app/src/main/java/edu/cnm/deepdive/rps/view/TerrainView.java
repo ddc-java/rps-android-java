@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019 Nicholas Bennett & Deep Dive Coding/CNM Ingenuity
+ *  Copyright 2020 Deep Dive Coding/CNM Ingenuity
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -38,12 +38,13 @@ public class TerrainView extends View {
   private static final long ACTIVE_SLEEP_INTERVAL = 10;
   private static final long INACTIVE_SLEEP_INTERVAL = 100;
 
+  private final Rect source = new Rect();
+  private final Rect dest = new Rect();
+
   private Bitmap bitmap;
   private Arena arena;
   private byte[][] terrain;
   private int[] breedColors;
-  private Rect source = new Rect();
-  private Rect dest = new Rect();
   private Updater updater;
 
   {
