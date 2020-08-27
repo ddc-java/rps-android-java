@@ -22,7 +22,7 @@ import android.view.MenuItem;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
-import androidx.lifecycle.ViewModelProviders;
+import androidx.lifecycle.ViewModelProvider;
 import edu.cnm.deepdive.rps.R;
 import edu.cnm.deepdive.rps.databinding.ActivityMainBinding;
 import edu.cnm.deepdive.rps.viewmodel.MainViewModel;
@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    viewModel = ViewModelProviders.of(this).get(MainViewModel.class);
+    viewModel = new ViewModelProvider(this).get(MainViewModel.class);
     getLifecycle().addObserver(viewModel);
     viewModel.isRunning().observe(this, (running) -> {
       if (running != this.running) {
